@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, status
 import aiohttp
 import asyncio
 
-from app.models import UserToLogin, Token, UserToRegistrate, UserID, UserToFrontend, PetitionsCity, City, PetitonID, PetitionData
+from app.models import UserToLogin, Token, UserToRegistrate, UserID, UserToFrontend, PetitionsCity, City, PetitonID, PetitionData, LikeIn, LikeOut, SubjectForBriefAnalysis
 from app.utils import send_to_get_data
 from app.config import CLIENT_SERVICE_ADDRESS, PETITION_SERVICE_ADDRESS
 
@@ -80,3 +80,25 @@ async def get_petition_data(petiton: PetitonID):
                         region = data["region"],
                         city_name = data["city_name"],
                         likes_count = data["likes_count"]), status.HTTP_200_OK
+
+# маршрут для установки или отмены лайка на запись
+@router.post("/like_petition")
+async def like_petition(like: LikeIn):
+    try:
+        result = await send_to_get_data(CLIENT_SERVICE_ADDRESS + '/verify_user', Token(token = like.user_token))
+        if result:
+            await send_to_get_data(PETITION_SERVICE_ADDRESS + '/like_petition', LikeOut(user_id = result[0]["id"], petition_id=like.petition_id))
+            return status.HTTP_200_OK
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+# маршрут для обновления статуса заявки
+
+# маршрут для получения краткой аналитики по населенному пункту
+@router.post("/get_brief_analysis")
+async def get_brief_analysis(subject: SubjectForBriefAnalysis):
+    try:
+        result = await send_to_get_data(PETITION_SERVICE_ADDRESS + '/get_brief_analysis', subject)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

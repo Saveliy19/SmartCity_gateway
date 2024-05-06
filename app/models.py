@@ -15,6 +15,8 @@ class UserID(BaseModel):
 class PetitionWithHeader(BaseModel):
     id: int
     header: str
+    status: str
+    address: str
 
 class PetitionsCity(BaseModel):
     petitions: List[PetitionWithHeader]
@@ -63,3 +65,16 @@ class PetitionData(BaseModel):
     likes_count: int
     region: str
     city_name: str
+
+class LikeIn(BaseModel):
+    user_token: str
+    petition_id: int
+
+class LikeOut(BaseModel):
+    user_id: int
+    petition_id: int
+
+class SubjectForBriefAnalysis(BaseModel):
+    type: str
+    name: str
+    period: str
