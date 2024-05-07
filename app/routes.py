@@ -75,8 +75,7 @@ async def get_petition_data(petiton: PetitonID):
                         status = data["status"],
                         petitioner_id = data["petitioner_id"],
                         submission_time = data["submission_time"],
-                        latitude = data["latitude"],
-                        longitude = data["longitude"],
+                        address = data["address"],
                         region = data["region"],
                         city_name = data["city_name"],
                         likes_count = data["likes_count"]), status.HTTP_200_OK

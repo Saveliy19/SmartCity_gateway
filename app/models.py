@@ -39,13 +39,12 @@ class UserToRegistrate(BaseModel):
     last_name: str
     first_name: str
     patronymic: str
-    rating: float
-    is_moderator: bool
     city: int
 
 class City(BaseModel):
     region: str
     name: str
+    is_initiative: bool
 
 class PetitonID(BaseModel):
     id: int
@@ -60,8 +59,7 @@ class PetitionData(BaseModel):
     status: str
     petitioner_id: int
     submission_time: str
-    latitude: float
-    longitude: float
+    address: str
     likes_count: int
     region: str
     city_name: str
