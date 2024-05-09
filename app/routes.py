@@ -3,6 +3,7 @@ import aiohttp
 import asyncio
 
 from app.models import UserToLogin, Token, UserToRegistrate, UserID, UserToFrontend, PetitionsCity, City, PetitonID, PetitionData, LikeIn, LikeOut, SubjectForBriefAnalysis
+from app.models import PetitionWithToken, OutputPetition
 from app.utils import send_to_get_data
 from app.config import CLIENT_SERVICE_ADDRESS, PETITION_SERVICE_ADDRESS
 
@@ -47,6 +48,26 @@ async def get_information_about_user(token: Token):
                           city = user_info[0]["city"],
                           region = user_info[0]["region"],
                           petitions = user_petitions_list)
+
+# маршрут для создания новой петиции
+@router.post("/make_petition")
+async def make_petition(content: PetitionWithToken):
+    try:
+        result = await send_to_get_data(CLIENT_SERVICE_ADDRESS + '/verify_user', Token(token = content.token))
+        if result:
+            output_petition = OutputPetition(header = content.header,
+                                            is_initiative = content.is_initiative,
+                                            category = content.category,
+                                            petition_description = content.description,
+                                            address = content.address,
+                                            region = content.region,
+                                            city_name = content.city_name,
+                                            petitioner_id = result[0]["id"])
+            print(output_petition)
+            await send_to_get_data(PETITION_SERVICE_ADDRESS + '/make_petition', output_petition)
+            return status.HTTP_200_OK
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # маршрут для получения списка петиций в городе
 @router.post("/get_city_petitions")

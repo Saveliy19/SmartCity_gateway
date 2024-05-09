@@ -76,3 +76,24 @@ class SubjectForBriefAnalysis(BaseModel):
     type: str
     name: str
     period: str
+
+
+class PetitionWithToken(BaseModel):
+    token: str
+    header: str
+    is_initiative: bool
+    category: str
+    description: str
+    address: str
+    region: str
+    city_name: str
+
+class OutputPetition(BaseModel):
+    header: str
+    is_initiative: bool
+    category: str
+    petition_description: str
+    address: str
+    region: str
+    city_name: str
+    petitioner_id: int
