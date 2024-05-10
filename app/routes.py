@@ -112,6 +112,17 @@ async def like_petition(like: LikeIn):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
+# маршрут для проверки лайка пользователя на записи
+@router.post("/check_like")
+async def check_like(like: LikeIn):
+    try:
+        user = await send_to_get_data(CLIENT_SERVICE_ADDRESS + '/verify_user', Token(token = like.user_token))
+        if user:
+            result = await send_to_get_data(PETITION_SERVICE_ADDRESS + '/check_like', LikeOut(user_id = user[0]["id"], petition_id=like.petition_id))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return result
+    
 # маршрут для обновления статуса заявки
 
 # маршрут для получения краткой аналитики по населенному пункту
