@@ -3,7 +3,7 @@ import aiohttp
 import asyncio
 
 from app.models import UserToLogin, Token, UserToRegistrate, UserID, UserToFrontend, PetitionsCity, City, PetitonID, PetitionData, LikeIn, LikeOut, SubjectForBriefAnalysis
-from app.models import PetitionWithToken, OutputPetition
+from app.models import PetitionWithToken, OutputPetition, PetitionStatus, PetitionStatusOutput
 from app.utils import send_to_get_data
 from app.config import CLIENT_SERVICE_ADDRESS, PETITION_SERVICE_ADDRESS
 
@@ -48,6 +48,11 @@ async def get_information_about_user(token: Token):
                           city = user_info[0]["city"],
                           region = user_info[0]["region"],
                           petitions = user_petitions_list)
+
+# маршрут для получения данных админа
+'''@router.post("/get_admin_data")
+async def get_admin_data(token: Token):'''
+
 
 # маршрут для создания новой петиции
 @router.post("/make_petition")
@@ -124,6 +129,21 @@ async def check_like(like: LikeIn):
     return result
     
 # маршрут для обновления статуса заявки
+@router.post("/update_petition")
+async def update_petition(petition: PetitionStatus):
+    try:
+        result = await send_to_get_data(CLIENT_SERVICE_ADDRESS + '/verify_user', Token(token = petition.user_token))
+        if result:
+            if result[0]["is_moderator"] == True:
+                await send_to_get_data(PETITION_SERVICE_ADDRESS + '/update_petition_status', PetitionStatusOutput(id=petition.id, 
+                                                                                                                  status=petition.status, 
+                                                                                                                  comment=petition.comment,
+                                                                                                                  admin_id=result[0]["id"]))
+                return status.HTTP_200_OK
+            else:
+                return status.HTTP_403_FORBIDDEN
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # маршрут для получения краткой аналитики по населенному пункту
 @router.post("/get_brief_analysis")

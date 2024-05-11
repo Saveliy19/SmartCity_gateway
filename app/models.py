@@ -77,6 +77,19 @@ class SubjectForBriefAnalysis(BaseModel):
     name: str
     period: str
 
+# класс для обновления статуса заявки
+class PetitionStatus(BaseModel):
+    id: int
+    user_token: str
+    status: str
+    comment: str
+
+# класс для обновления статуса заявки
+class PetitionStatusOutput(BaseModel):
+    status: str
+    id: int
+    admin_id: int
+    comment: str
 
 class PetitionWithToken(BaseModel):
     token: str
