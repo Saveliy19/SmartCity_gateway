@@ -17,12 +17,15 @@ class PetitionWithHeader(BaseModel):
     header: str
     status: str
     address: str
+    date: str
+    likes: int
 
 class PetitionsCity(BaseModel):
     petitions: List[PetitionWithHeader]
 
 class UserToFrontend(BaseModel):
     id: int
+    email: EmailStr
     last_name: str
     first_name: str
     patronymic: str
@@ -30,6 +33,15 @@ class UserToFrontend(BaseModel):
     city: str
     region: str
     petitions: List[PetitionWithHeader]
+
+class AdminToFrontend(BaseModel):
+    id: int
+    email: EmailStr
+    last_name: str
+    first_name: str
+    patronymic: str
+    city: str
+    region: str
 
 
 
@@ -44,6 +56,8 @@ class UserToRegistrate(BaseModel):
 class City(BaseModel):
     region: str
     name: str
+
+class CityWithType(City):
     is_initiative: bool
 
 class PetitonID(BaseModel):
@@ -76,6 +90,13 @@ class SubjectForBriefAnalysis(BaseModel):
     type: str
     name: str
     period: str
+
+class AdminPetitions(BaseModel):
+    token: str
+    region: str
+    city_name: str
+
+
 
 # класс для обновления статуса заявки
 class PetitionStatus(BaseModel):

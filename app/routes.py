@@ -2,8 +2,8 @@ from fastapi import APIRouter, HTTPException, status
 import aiohttp
 import asyncio
 
-from app.models import UserToLogin, Token, UserToRegistrate, UserID, UserToFrontend, PetitionsCity, City, PetitonID, PetitionData, LikeIn, LikeOut, SubjectForBriefAnalysis
-from app.models import PetitionWithToken, OutputPetition, PetitionStatus, PetitionStatusOutput
+from app.models import UserToLogin, Token, UserToRegistrate, UserID, UserToFrontend, PetitionsCity, CityWithType, PetitonID, PetitionData, LikeIn, LikeOut, SubjectForBriefAnalysis
+from app.models import PetitionWithToken, OutputPetition, PetitionStatus, PetitionStatusOutput, AdminToFrontend, AdminPetitions, City
 from app.utils import send_to_get_data
 from app.config import CLIENT_SERVICE_ADDRESS, PETITION_SERVICE_ADDRESS
 
@@ -41,6 +41,7 @@ async def get_information_about_user(token: Token):
         # Если сервис петиций не отвечает, то список заявок пользователя пуст
         user_petitions_list = []
     return UserToFrontend(id = user_info[0]["id"],
+                          email = user_info[0]["email"],
                           last_name = user_info[0]["last_name"],
                           first_name = user_info[0]["first_name"],
                           patronymic = user_info[0]["patronymic"],
@@ -49,9 +50,21 @@ async def get_information_about_user(token: Token):
                           region = user_info[0]["region"],
                           petitions = user_petitions_list)
 
+
 # маршрут для получения данных админа
-'''@router.post("/get_admin_data")
-async def get_admin_data(token: Token):'''
+@router.post("/get_admin_data")
+async def get_admin_data(token: Token):
+    try:
+        admin_info = await send_to_get_data(CLIENT_SERVICE_ADDRESS + '/get_data', token)
+    except aiohttp.ClientError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return AdminToFrontend(id = admin_info[0]["id"],
+                          email = admin_info[0]["email"],
+                          last_name = admin_info[0]["last_name"],
+                          first_name = admin_info[0]["first_name"],
+                          patronymic = admin_info[0]["patronymic"],
+                          city = admin_info[0]["city"],
+                          region = admin_info[0]["region"])
 
 
 # маршрут для создания новой петиции
@@ -76,7 +89,7 @@ async def make_petition(content: PetitionWithToken):
 
 # маршрут для получения списка петиций в городе
 @router.post("/get_city_petitions")
-async def get_city_petitions(city: City):
+async def get_city_petitions(city: CityWithType):
     try:
         result = await send_to_get_data(PETITION_SERVICE_ADDRESS + '/get_city_petitions', city)
         petitions = result[0]["petitions"]
@@ -84,6 +97,20 @@ async def get_city_petitions(city: City):
         raise HTTPException(status_code=500, detail=str(e))
     return PetitionsCity(petitions = petitions), status.HTTP_200_OK
     
+# маршрут для получения списка петиций по админскому токену и городу
+@router.post("/get_admin_petitions")
+async def get_admin_petitions(data: AdminPetitions):
+    try:
+        result = await send_to_get_data(CLIENT_SERVICE_ADDRESS + '/verify_user', Token(token = data.token))
+        if result:
+            if result[0]["is_moderator"] == True:
+                petitions = await send_to_get_data(PETITION_SERVICE_ADDRESS + '/get_admins_city_petitions', City(region=data.region, name=data.city_name))
+            else:
+                return status.HTTP_403_FORBIDDEN
+        if petitions:
+            return petitions
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
         
 # маршрут для получения полной информации по петиции
 @router.post("/get_petition_data")
