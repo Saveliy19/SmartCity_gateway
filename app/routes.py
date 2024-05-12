@@ -131,7 +131,8 @@ async def get_petition_data(petiton: PetitonID):
                         address = data["address"],
                         region = data["region"],
                         city_name = data["city_name"],
-                        likes_count = data["likes_count"]), status.HTTP_200_OK
+                        likes_count = data["likes_count"],
+                        comments = data["comments"]), status.HTTP_200_OK
 
 # маршрут для установки или отмены лайка на запись
 @router.post("/like_petition")
