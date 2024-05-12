@@ -1,9 +1,12 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, UploadFile, File, Form
+from typing import List
 import aiohttp
 import asyncio
 
+import os
+import base64
 from app.models import UserToLogin, Token, UserToRegistrate, UserID, UserToFrontend, PetitionsCity, CityWithType, PetitonID, PetitionData, LikeIn, LikeOut, SubjectForBriefAnalysis
-from app.models import PetitionWithToken, OutputPetition, PetitionStatus, PetitionStatusOutput, AdminToFrontend, AdminPetitions, City
+from app.models import PetitionWithToken, OutputPetition, PetitionStatus, PetitionStatusOutput, AdminToFrontend, AdminPetitions, City, Photo
 from app.utils import send_to_get_data
 from app.config import CLIENT_SERVICE_ADDRESS, PETITION_SERVICE_ADDRESS
 
@@ -69,18 +72,29 @@ async def get_admin_data(token: Token):
 
 # маршрут для создания новой петиции
 @router.post("/make_petition")
-async def make_petition(content: PetitionWithToken):
+async def make_petition(header: str = Form(...),
+                        is_initiative: bool = Form(...),
+                        category: str = Form(...),
+                        description: str = Form(...),
+                        address: str = Form(...),
+                        city_name: str = Form(...),
+                        photos: List[UploadFile] = File(...),
+                        token: str = Form(...),
+                        region: str = Form(...)):
+    files = [Photo(filename=p.filename, content=base64.b64encode(await p.read()).decode('utf-8')) for p in photos]
+    print(files)
     try:
-        result = await send_to_get_data(CLIENT_SERVICE_ADDRESS + '/verify_user', Token(token = content.token))
+        result = await send_to_get_data(CLIENT_SERVICE_ADDRESS + '/verify_user', Token(token = token))
         if result:
-            output_petition = OutputPetition(header = content.header,
-                                            is_initiative = content.is_initiative,
-                                            category = content.category,
-                                            petition_description = content.description,
-                                            address = content.address,
-                                            region = content.region,
-                                            city_name = content.city_name,
-                                            petitioner_id = result[0]["id"])
+            output_petition = OutputPetition(header = header,
+                                            is_initiative = is_initiative,
+                                            category = category,
+                                            petition_description = description,
+                                            address =address,
+                                            region = region,
+                                            city_name = city_name,
+                                            petitioner_id = result[0]["id"],
+                                            photos = files)
             print(output_petition)
             await send_to_get_data(PETITION_SERVICE_ADDRESS + '/make_petition', output_petition)
             return status.HTTP_200_OK

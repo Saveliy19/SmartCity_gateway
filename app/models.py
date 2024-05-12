@@ -1,5 +1,6 @@
 from pydantic import BaseModel, EmailStr
 from typing import List
+from fastapi import File, UploadFile
 
 class UserToLogin(BaseModel):
     email: EmailStr
@@ -126,6 +127,12 @@ class PetitionWithToken(BaseModel):
     address: str
     region: str
     city_name: str
+    photo: bytes
+    
+
+class Photo(BaseModel):
+    filename: str
+    content: str
 
 class OutputPetition(BaseModel):
     header: str
@@ -136,3 +143,4 @@ class OutputPetition(BaseModel):
     region: str
     city_name: str
     petitioner_id: int
+    photos: List[Photo]
