@@ -44,7 +44,9 @@ class AdminToFrontend(BaseModel):
     city: str
     region: str
 
-
+class Photo(BaseModel):
+    filename: str
+    content: str
 
 class UserToRegistrate(BaseModel):
     email: EmailStr
@@ -83,6 +85,7 @@ class PetitionData(BaseModel):
     region: str
     city_name: str
     comments: List[Comment]
+    photos: List[str]
 
 class LikeIn(BaseModel):
     user_token: str
@@ -130,9 +133,7 @@ class PetitionWithToken(BaseModel):
     photo: bytes
     
 
-class Photo(BaseModel):
-    filename: str
-    content: str
+
 
 class OutputPetition(BaseModel):
     header: str
