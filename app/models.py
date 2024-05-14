@@ -9,8 +9,8 @@ class UserToLogin(BaseModel):
 class Token(BaseModel):
     token: str
 
-class UserID(BaseModel):
-    id: int
+class UserEmail(BaseModel):
+    email: EmailStr
 
 # класс с краткой информации о петиции
 class PetitionWithHeader(BaseModel):
@@ -78,7 +78,7 @@ class PetitionData(BaseModel):
     category: str
     description: str
     status: str
-    petitioner_id: int
+    petitioner_email: str
     submission_time: str
     address: str
     likes_count: int
@@ -143,5 +143,5 @@ class OutputPetition(BaseModel):
     address: str
     region: str
     city_name: str
-    petitioner_id: int
+    petitioner_email: EmailStr
     photos: List[Photo]

@@ -1,12 +1,10 @@
 from fastapi import APIRouter, HTTPException, status, UploadFile, File, Form
 from typing import List
 import aiohttp
-import asyncio
 
-import os
 import base64
-from app.models import UserToLogin, Token, UserToRegistrate, UserID, UserToFrontend, PetitionsCity, CityWithType, PetitonID, PetitionData, LikeIn, LikeOut, SubjectForBriefAnalysis
-from app.models import PetitionWithToken, OutputPetition, PetitionStatus, PetitionStatusOutput, AdminToFrontend, AdminPetitions, City, Photo
+from app.models import UserToLogin, Token, UserToRegistrate, UserEmail, UserToFrontend, PetitionsCity, CityWithType, PetitonID, PetitionData, LikeIn, LikeOut, SubjectForBriefAnalysis
+from app.models import  OutputPetition, PetitionStatus, PetitionStatusOutput, AdminToFrontend, AdminPetitions, City, Photo
 from app.utils import send_to_get_data, send_notification_by_email
 from app.config import CLIENT_SERVICE_ADDRESS, PETITION_SERVICE_ADDRESS
 
@@ -38,7 +36,7 @@ async def get_information_about_user(token: Token):
     except aiohttp.ClientError as e:
         raise HTTPException(status_code=500, detail=str(e))
     try:
-        user_petitions = await send_to_get_data(PETITION_SERVICE_ADDRESS + '/get_petitions', UserID(id=user_info[0]["id"]))
+        user_petitions = await send_to_get_data(PETITION_SERVICE_ADDRESS + '/get_petitions', UserEmail(email=user_info[0]["email"]))
         user_petitions_list = user_petitions[0]["petitions"]
     except aiohttp.ClientError:
         # Если сервис петиций не отвечает, то список заявок пользователя пуст
@@ -82,24 +80,23 @@ async def make_petition(header: str = Form(...),
                         token: str = Form(...),
                         region: str = Form(...)):
     files = [Photo(filename=p.filename, content=base64.b64encode(await p.read()).decode('utf-8')) for p in photos]
-    print(files)
-    try:
-        result = await send_to_get_data(CLIENT_SERVICE_ADDRESS + '/verify_user', Token(token = token))
-        if result:
-            output_petition = OutputPetition(header = header,
-                                            is_initiative = is_initiative,
-                                            category = category,
-                                            petition_description = description,
-                                            address =address,
-                                            region = region,
-                                            city_name = city_name,
-                                            petitioner_id = result[0]["id"],
-                                            photos = files)
-            print(output_petition)
-            await send_to_get_data(PETITION_SERVICE_ADDRESS + '/make_petition', output_petition)
-            return status.HTTP_200_OK
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    #try:
+    result = await send_to_get_data(CLIENT_SERVICE_ADDRESS + '/verify_user', Token(token = token))
+    print(result)
+    if result:
+        output_petition = OutputPetition(header = header,
+                                        is_initiative = is_initiative,
+                                        category = category,
+                                        petition_description = description,
+                                        address =address,
+                                        region = region,
+                                        city_name = city_name,
+                                        petitioner_email = result[0]["email"],
+                                        photos = files)
+        await send_to_get_data(PETITION_SERVICE_ADDRESS + '/make_petition', output_petition)
+        return status.HTTP_200_OK
+    #except Exception as e:
+        #raise HTTPException(status_code=500, detail=str(e))
 
 # маршрут для получения списка петиций в городе
 @router.post("/get_city_petitions")
@@ -140,7 +137,7 @@ async def get_petition_data(petiton: PetitonID):
                         category = data["category"],
                         description = data["description"],
                         status = data["status"],
-                        petitioner_id = data["petitioner_id"],
+                        petitioner_email = data["petitioner_email"],
                         submission_time = data["submission_time"],
                         address = data["address"],
                         region = data["region"],
@@ -178,7 +175,7 @@ async def update_petition(petition: PetitionStatus):
         result = await send_to_get_data(CLIENT_SERVICE_ADDRESS + '/verify_user', Token(token = petition.user_token))
         if result:
             if result[0]["is_moderator"] == True:
-                await send_to_get_data(PETITION_SERVICE_ADDRESS + '/update_petition_status', PetitionStatusOutput(id=petition.id, 
+                email = await send_to_get_data(PETITION_SERVICE_ADDRESS + '/update_petition_status', PetitionStatusOutput(id=petition.id, 
                                                                                                                   status=petition.status, 
                                                                                                                   comment=petition.comment,
                                                                                                                   admin_id=result[0]["id"]))
@@ -186,7 +183,7 @@ async def update_petition(petition: PetitionStatus):
                 return status.HTTP_403_FORBIDDEN
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    await send_notification_by_email('saveliy200319@gmail.com', 'Обновление статуса заявки',  f'Новый статус завки - {petition.status}')
+    await send_notification_by_email(email[0]["petitioner_email"], f'Обновление статуса заявки №{petition.id}:',  f' Новый статус завки - {petition.status.upper()}')
     return status.HTTP_200_OK
     
 
