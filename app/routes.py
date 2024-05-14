@@ -7,7 +7,7 @@ import os
 import base64
 from app.models import UserToLogin, Token, UserToRegistrate, UserID, UserToFrontend, PetitionsCity, CityWithType, PetitonID, PetitionData, LikeIn, LikeOut, SubjectForBriefAnalysis
 from app.models import PetitionWithToken, OutputPetition, PetitionStatus, PetitionStatusOutput, AdminToFrontend, AdminPetitions, City, Photo
-from app.utils import send_to_get_data
+from app.utils import send_to_get_data, send_notification_by_email
 from app.config import CLIENT_SERVICE_ADDRESS, PETITION_SERVICE_ADDRESS
 
 router = APIRouter()
@@ -182,11 +182,13 @@ async def update_petition(petition: PetitionStatus):
                                                                                                                   status=petition.status, 
                                                                                                                   comment=petition.comment,
                                                                                                                   admin_id=result[0]["id"]))
-                return status.HTTP_200_OK
             else:
                 return status.HTTP_403_FORBIDDEN
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    await send_notification_by_email('saveliy200319@gmail.com', 'Обновление статуса заявки',  f'Новый статус завки - {petition.status}')
+    return status.HTTP_200_OK
+    
 
 # маршрут для получения краткой аналитики по населенному пункту
 @router.post("/get_brief_analysis")
