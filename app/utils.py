@@ -1,5 +1,6 @@
 import aiohttp
 from fastapi import HTTPException
+import json
 
 from app.rmq import RabbitMQManager
 
@@ -13,6 +14,11 @@ async def send_to_get_data(url, data):
             return await response.json()
         
 
-async def send_notification_by_email(email: str, subject:str, content: str):
-    message_data = f'{email},{subject},{content}'
+async def send_notification_by_email(emails: list, subject:str, content: str):
+    data = {
+    'email_addresses': emails,
+    'subject': subject,
+    'message': content
+    }
+    message_data = json.dumps(data)
     rabbitmq_manager.send_message('notification_queue', message_data)

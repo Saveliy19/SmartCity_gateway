@@ -92,7 +92,7 @@ class LikeIn(BaseModel):
     petition_id: int
 
 class LikeOut(BaseModel):
-    user_id: int
+    user_email: EmailStr
     petition_id: int
 
 class SubjectForBriefAnalysis(BaseModel):
@@ -145,3 +145,13 @@ class OutputPetition(BaseModel):
     city_name: str
     petitioner_email: EmailStr
     photos: List[Photo]
+
+class RegionForDetailedAnalysis(BaseModel):
+    region_name: str
+    city_name: str
+    start_time: str
+    end_time: str
+    rows_count: int
+
+class DataForDetailedAnalysis(RegionForDetailedAnalysis):
+    user_token: str

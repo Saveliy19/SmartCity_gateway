@@ -4,7 +4,7 @@ import aiohttp
 
 import base64
 from app.models import UserToLogin, Token, UserToRegistrate, UserEmail, UserToFrontend, PetitionsCity, CityWithType, PetitonID, PetitionData, LikeIn, LikeOut, SubjectForBriefAnalysis
-from app.models import  OutputPetition, PetitionStatus, PetitionStatusOutput, AdminToFrontend, AdminPetitions, City, Photo
+from app.models import  OutputPetition, PetitionStatus, PetitionStatusOutput, AdminToFrontend, AdminPetitions, City, Photo, DataForDetailedAnalysis, RegionForDetailedAnalysis
 from app.utils import send_to_get_data, send_notification_by_email
 from app.config import CLIENT_SERVICE_ADDRESS, PETITION_SERVICE_ADDRESS
 
@@ -15,9 +15,10 @@ router = APIRouter()
 async def registrate_new_user(user: UserToRegistrate):
     try:
         result = await send_to_get_data(CLIENT_SERVICE_ADDRESS + '/registration', user)
-        return result
     except aiohttp.ClientError as e:
         raise HTTPException(status_code=500, detail=str(e))
+    await send_notification_by_email([result[0]["email"]], 'Регистрация в системе "Умный город"', f'{user.first_name}, поздравляем Вас с успешной регистрацией в системе "Умный город!"')
+    return result
 
 #  маршрут для авторизации и получения jwt токена
 @router.post("/login")
@@ -98,6 +99,12 @@ async def make_petition(header: str = Form(...),
     #except Exception as e:
         #raise HTTPException(status_code=500, detail=str(e))
 
+'''@router.get("/images/{image_path:path}")
+async def get_image(image_path: str):
+    result = await get_image_from_service(PETITION_SERVICE_ADDRESS + '/images')
+    return result'''
+
+
 # маршрут для получения списка петиций в городе
 @router.post("/get_city_petitions")
 async def get_city_petitions(city: CityWithType):
@@ -150,9 +157,9 @@ async def get_petition_data(petiton: PetitonID):
 @router.post("/like_petition")
 async def like_petition(like: LikeIn):
     try:
-        result = await send_to_get_data(CLIENT_SERVICE_ADDRESS + '/verify_user', Token(token = like.user_token))
-        if result:
-            await send_to_get_data(PETITION_SERVICE_ADDRESS + '/like_petition', LikeOut(user_id = result[0]["id"], petition_id=like.petition_id))
+        user = await send_to_get_data(CLIENT_SERVICE_ADDRESS + '/verify_user', Token(token = like.user_token))
+        if user:
+            await send_to_get_data(PETITION_SERVICE_ADDRESS + '/like_petition', LikeOut(user_email = user[0]["email"], petition_id=like.petition_id))
             return status.HTTP_200_OK
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -163,7 +170,7 @@ async def check_like(like: LikeIn):
     try:
         user = await send_to_get_data(CLIENT_SERVICE_ADDRESS + '/verify_user', Token(token = like.user_token))
         if user:
-            result = await send_to_get_data(PETITION_SERVICE_ADDRESS + '/check_like', LikeOut(user_id = user[0]["id"], petition_id=like.petition_id))
+            result = await send_to_get_data(PETITION_SERVICE_ADDRESS + '/check_like', LikeOut(user_email = user[0]["email"], petition_id=like.petition_id))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     return result
@@ -172,19 +179,38 @@ async def check_like(like: LikeIn):
 @router.post("/update_petition")
 async def update_petition(petition: PetitionStatus):
     try:
-        result = await send_to_get_data(CLIENT_SERVICE_ADDRESS + '/verify_user', Token(token = petition.user_token))
-        if result:
-            if result[0]["is_moderator"] == True:
-                email = await send_to_get_data(PETITION_SERVICE_ADDRESS + '/update_petition_status', PetitionStatusOutput(id=petition.id, 
+        user = await send_to_get_data(CLIENT_SERVICE_ADDRESS + '/verify_user', Token(token = petition.user_token))
+        if user:
+            if user[0]["is_moderator"] == True:
+                emails = await send_to_get_data(PETITION_SERVICE_ADDRESS + '/update_petition_status', PetitionStatusOutput(id=petition.id, 
                                                                                                                   status=petition.status, 
                                                                                                                   comment=petition.comment,
-                                                                                                                  admin_id=result[0]["id"]))
+                                                                                                                  admin_id=user[0]["id"]))
             else:
                 return status.HTTP_403_FORBIDDEN
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    await send_notification_by_email(email[0]["petitioner_email"], f'Обновление статуса заявки №{petition.id}:',  f' Новый статус завки - {petition.status.upper()}')
+    await send_notification_by_email(emails[0]["petitioner_emails"], f'Обновление статуса заявки №{petition.id}:',  f' Новый статус завки - {petition.status.upper()}')
     return status.HTTP_200_OK
+
+# маршрут для обновления статуса заявки
+@router.post("/get_detailed_analysis")
+async def get_detailed_analysis(data: DataForDetailedAnalysis):
+    try:
+        result = await send_to_get_data(CLIENT_SERVICE_ADDRESS + '/verify_user', Token(token = data.user_token))
+        if result:
+            if result[0]["is_moderator"] == True:
+                Analysis = await send_to_get_data(PETITION_SERVICE_ADDRESS + '/get_detailed_analysis', RegionForDetailedAnalysis(region_name=data.region_name,
+                                                                                                                              city_name=data.city_name,
+                                                                                                                              start_time=data.start_time,
+                                                                                                                              end_time=data.end_time,
+                                                                                                                              rows_count=data.rows_count))
+                return Analysis
+            else:
+                return status.HTTP_403_FORBIDDEN
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
     
 
 # маршрут для получения краткой аналитики по населенному пункту
