@@ -95,9 +95,7 @@ class LikeOut(BaseModel):
     user_email: EmailStr
     petition_id: int
 
-class SubjectForBriefAnalysis(BaseModel):
-    type: str
-    name: str
+class SubjectForBriefAnalysis(City):
     period: str
 
 class AdminPetitions(BaseModel):

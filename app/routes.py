@@ -2,10 +2,14 @@ from fastapi import APIRouter, HTTPException, status, UploadFile, File, Form
 from typing import List
 import aiohttp
 
+from app.logging import logging
+
 import base64
-from app.models import UserToLogin, Token, UserToRegistrate, UserEmail, UserToFrontend, PetitionsCity, CityWithType, PetitonID, PetitionData, LikeIn, LikeOut, SubjectForBriefAnalysis
-from app.models import  OutputPetition, PetitionStatus, PetitionStatusOutput, AdminToFrontend, AdminPetitions, City, Photo, DataForDetailedAnalysis, RegionForDetailedAnalysis
-from app.utils import send_to_get_data, send_notification_by_email
+from app.models import (UserToLogin, Token, UserToRegistrate, UserEmail, UserToFrontend, PetitionsCity,
+                        CityWithType, PetitonID, PetitionData, LikeIn, LikeOut, SubjectForBriefAnalysis,
+                        OutputPetition, PetitionStatus, PetitionStatusOutput, AdminToFrontend, AdminPetitions,
+                          City, Photo, DataForDetailedAnalysis, RegionForDetailedAnalysis)
+from app.utils import send_to_get_data, send_notification_by_email, fetch_data
 from app.config import CLIENT_SERVICE_ADDRESS, PETITION_SERVICE_ADDRESS
 
 router = APIRouter()
@@ -17,7 +21,8 @@ async def registrate_new_user(user: UserToRegistrate):
         result = await send_to_get_data(CLIENT_SERVICE_ADDRESS + '/registration', user)
     except aiohttp.ClientError as e:
         raise HTTPException(status_code=500, detail=str(e))
-    await send_notification_by_email([result[0]["email"]], 'Регистрация в системе "Умный город"', f'{user.first_name}, поздравляем Вас с успешной регистрацией в системе "Умный город!"')
+    if result:
+        await send_notification_by_email([user.email], 'Регистрация в системе "Умный город"', f'{user.first_name}, поздравляем Вас с успешной регистрацией в системе "Умный город!"')
     return result
 
 #  маршрут для авторизации и получения jwt токена
@@ -51,6 +56,17 @@ async def get_information_about_user(token: Token):
                           city = user_info[0]["city"],
                           region = user_info[0]["region"],
                           petitions = user_petitions_list)
+
+# получение списка городов
+@router.get("/get_cities")
+async def get_citites():
+    try:
+        print(CLIENT_SERVICE_ADDRESS + '/get_citites')
+        citites_per_region = await fetch_data(CLIENT_SERVICE_ADDRESS + '/get_cities')
+        if citites_per_region:
+            return citites_per_region
+    except:
+        raise HTTPException(status_code=500)
 
 
 # маршрут для получения данных админа
