@@ -2,7 +2,6 @@ from fastapi import APIRouter, HTTPException, status, UploadFile, File, Form
 from typing import List
 import aiohttp
 
-from app.logging import logging
 
 import base64
 from app.models import (UserToLogin, Token, UserToRegistrate, UserEmail, UserToFrontend, PetitionsCity,
@@ -61,7 +60,6 @@ async def get_information_about_user(token: Token):
 @router.get("/get_cities")
 async def get_citites():
     try:
-        print(CLIENT_SERVICE_ADDRESS + '/get_citites')
         citites_per_region = await fetch_data(CLIENT_SERVICE_ADDRESS + '/get_cities')
         if citites_per_region:
             return citites_per_region
@@ -96,29 +94,23 @@ async def make_petition(header: str = Form(...),
                         photos: List[UploadFile] = File(...),
                         token: str = Form(...),
                         region: str = Form(...)):
-    files = [Photo(filename=p.filename, content=base64.b64encode(await p.read()).decode('utf-8')) for p in photos]
-    #try:
-    result = await send_to_get_data(CLIENT_SERVICE_ADDRESS + '/verify_user', Token(token = token))
-    print(result)
-    if result:
-        output_petition = OutputPetition(header = header,
-                                        is_initiative = is_initiative,
-                                        category = category,
-                                        petition_description = description,
-                                        address =address,
-                                        region = region,
-                                        city_name = city_name,
-                                        petitioner_email = result[0]["email"],
-                                        photos = files)
-        await send_to_get_data(PETITION_SERVICE_ADDRESS + '/make_petition', output_petition)
-        return status.HTTP_200_OK
-    #except Exception as e:
-        #raise HTTPException(status_code=500, detail=str(e))
-
-'''@router.get("/images/{image_path:path}")
-async def get_image(image_path: str):
-    result = await get_image_from_service(PETITION_SERVICE_ADDRESS + '/images')
-    return result'''
+    try:
+        result = await send_to_get_data(CLIENT_SERVICE_ADDRESS + '/verify_user', Token(token = token))
+        if result:
+            files = [Photo(filename=p.filename, content=base64.b64encode(await p.read()).decode('utf-8')) for p in photos]
+            output_petition = OutputPetition(header = header,
+                                            is_initiative = is_initiative,
+                                            category = category,
+                                            petition_description = description,
+                                            address =address,
+                                            region = region,
+                                            city_name = city_name,
+                                            petitioner_email = result[0]["email"],
+                                            photos = files)
+            await send_to_get_data(PETITION_SERVICE_ADDRESS + '/make_petition', output_petition)
+            return status.HTTP_200_OK
+    except Exception as e:
+        raise HTTPException(status_code=500)
 
 
 # маршрут для получения списка петиций в городе
