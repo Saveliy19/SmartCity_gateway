@@ -117,6 +117,8 @@ class PetitionStatusOutput(BaseModel):
     status: str
     id: int
     admin_id: int
+    admin_region: str
+    admin_city: str
     comment: str
 
 class PetitionWithToken(BaseModel):

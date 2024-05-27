@@ -48,6 +48,4 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         
         return response
 
-def setup_logging():
-    # Вызываем настройку логгера
-    pass  # Эта функция больше не нужна, так как логгер настроен при импорте
+

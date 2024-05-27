@@ -1,8 +1,6 @@
 from fastapi import APIRouter, HTTPException, status, UploadFile, File, Form
 from typing import List
 import aiohttp
-
-
 import base64
 from app.models import (UserToLogin, Token, UserToRegistrate, UserEmail, UserToFrontend, PetitionsCity,
                         CityWithType, PetitonID, PetitionData, LikeIn, LikeOut, SubjectForBriefAnalysis,
@@ -10,6 +8,8 @@ from app.models import (UserToLogin, Token, UserToRegistrate, UserEmail, UserToF
                           City, Photo, DataForDetailedAnalysis, RegionForDetailedAnalysis)
 from app.utils import send_to_get_data, send_notification_by_email, fetch_data
 from app.config import CLIENT_SERVICE_ADDRESS, PETITION_SERVICE_ADDRESS
+
+from app.logger import logger
 
 router = APIRouter()
 
@@ -20,8 +20,15 @@ async def registrate_new_user(user: UserToRegistrate):
         result = await send_to_get_data(CLIENT_SERVICE_ADDRESS + '/registration', user)
     except aiohttp.ClientError as e:
         raise HTTPException(status_code=500, detail=str(e))
-    if result:
-        await send_notification_by_email([user.email], 'Регистрация в системе "Умный город"', f'{user.first_name}, поздравляем Вас с успешной регистрацией в системе "Умный город!"')
+    try:
+        await send_notification_by_email(
+            [user.email], 
+            f'Регистрация в системе "Умный город"',  
+            f'{user.first_name}, поздравляем Вас с успешной регистрацией в системе "Умный город!"'
+        )
+    except Exception as e:
+        # Логируем возможные ошибки отправки письма
+        logger.error(f"Ошибка отправки письма: {str(e)}")
     return result
 
 #  маршрут для авторизации и получения jwt токена
@@ -29,9 +36,9 @@ async def registrate_new_user(user: UserToRegistrate):
 async def login(user: UserToLogin):
     try:
         result = await send_to_get_data(CLIENT_SERVICE_ADDRESS + '/token', user)
-        return result
     except aiohttp.ClientError as e:
         raise HTTPException(status_code=500, detail=str(e))
+    return result
     
 # маршрут личного кабинета пользователя
 @router.post("/me")
@@ -39,7 +46,7 @@ async def get_information_about_user(token: Token):
     try:
         user_info = await send_to_get_data(CLIENT_SERVICE_ADDRESS + '/get_data', token)
     except aiohttp.ClientError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500)
     try:
         user_petitions = await send_to_get_data(PETITION_SERVICE_ADDRESS + '/get_petitions', UserEmail(email=user_info[0]["email"]))
         user_petitions_list = user_petitions[0]["petitions"]
@@ -61,10 +68,9 @@ async def get_information_about_user(token: Token):
 async def get_citites():
     try:
         citites_per_region = await fetch_data(CLIENT_SERVICE_ADDRESS + '/get_cities')
-        if citites_per_region:
-            return citites_per_region
-    except:
+    except aiohttp.ClientError:
         raise HTTPException(status_code=500)
+    return citites_per_region
 
 
 # маршрут для получения данных админа
@@ -72,8 +78,8 @@ async def get_citites():
 async def get_admin_data(token: Token):
     try:
         admin_info = await send_to_get_data(CLIENT_SERVICE_ADDRESS + '/get_data', token)
-    except aiohttp.ClientError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except aiohttp.ClientError:
+        raise HTTPException(status_code=500)
     return AdminToFrontend(id = admin_info[0]["id"],
                           email = admin_info[0]["email"],
                           last_name = admin_info[0]["last_name"],
@@ -95,8 +101,8 @@ async def make_petition(header: str = Form(...),
                         token: str = Form(...),
                         region: str = Form(...)):
     try:
-        result = await send_to_get_data(CLIENT_SERVICE_ADDRESS + '/verify_user', Token(token = token))
-        if result:
+        user = await send_to_get_data(CLIENT_SERVICE_ADDRESS + '/verify_user', Token(token = token))
+        if user:
             files = [Photo(filename=p.filename, content=base64.b64encode(await p.read()).decode('utf-8')) for p in photos]
             output_petition = OutputPetition(header = header,
                                             is_initiative = is_initiative,
@@ -105,12 +111,12 @@ async def make_petition(header: str = Form(...),
                                             address =address,
                                             region = region,
                                             city_name = city_name,
-                                            petitioner_email = result[0]["email"],
+                                            petitioner_email = user[0]["email"],
                                             photos = files)
-            await send_to_get_data(PETITION_SERVICE_ADDRESS + '/make_petition', output_petition)
-            return status.HTTP_200_OK
-    except Exception as e:
+            result = await send_to_get_data(PETITION_SERVICE_ADDRESS + '/make_petition', output_petition)
+    except:
         raise HTTPException(status_code=500)
+    return result
 
 
 # маршрут для получения списка петиций в городе
@@ -119,24 +125,23 @@ async def get_city_petitions(city: CityWithType):
     try:
         result = await send_to_get_data(PETITION_SERVICE_ADDRESS + '/get_city_petitions', city)
         petitions = result[0]["petitions"]
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except:
+        raise HTTPException(status_code=500)
     return PetitionsCity(petitions = petitions), status.HTTP_200_OK
     
 # маршрут для получения списка петиций по админскому токену и городу
 @router.post("/get_admin_petitions")
 async def get_admin_petitions(data: AdminPetitions):
     try:
-        result = await send_to_get_data(CLIENT_SERVICE_ADDRESS + '/verify_user', Token(token = data.token))
-        if result:
-            if result[0]["is_moderator"] == True:
+        user = await send_to_get_data(CLIENT_SERVICE_ADDRESS + '/verify_user', Token(token = data.token))
+        if user:
+            if user[0]["is_moderator"] == True:
                 petitions = await send_to_get_data(PETITION_SERVICE_ADDRESS + '/get_admins_city_petitions', City(region=data.region, name=data.city_name))
             else:
                 return status.HTTP_403_FORBIDDEN
-        if petitions:
-            return petitions
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    return petitions
         
 # маршрут для получения полной информации по петиции
 @router.post("/get_petition_data")
@@ -144,8 +149,8 @@ async def get_petition_data(petiton: PetitonID):
     try:
         result = await send_to_get_data(PETITION_SERVICE_ADDRESS + '/get_petition_data', petiton)
         data = result[0]
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except:
+        raise HTTPException(status_code=500)
     return PetitionData(id = data["id"], 
                         header = data["header"], 
                         is_initiative = data["is_initiative"], 
@@ -167,10 +172,10 @@ async def like_petition(like: LikeIn):
     try:
         user = await send_to_get_data(CLIENT_SERVICE_ADDRESS + '/verify_user', Token(token = like.user_token))
         if user:
-            await send_to_get_data(PETITION_SERVICE_ADDRESS + '/like_petition', LikeOut(user_email = user[0]["email"], petition_id=like.petition_id))
-            return status.HTTP_200_OK
+            result = await send_to_get_data(PETITION_SERVICE_ADDRESS + '/like_petition', LikeOut(user_email = user[0]["email"], petition_id=like.petition_id))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    return result
     
 # маршрут для проверки лайка пользователя на записи
 @router.post("/check_like")
@@ -188,36 +193,46 @@ async def check_like(like: LikeIn):
 async def update_petition(petition: PetitionStatus):
     try:
         user = await send_to_get_data(CLIENT_SERVICE_ADDRESS + '/verify_user', Token(token = petition.user_token))
-        if user:
-            if user[0]["is_moderator"] == True:
-                emails = await send_to_get_data(PETITION_SERVICE_ADDRESS + '/update_petition_status', PetitionStatusOutput(id=petition.id, 
-                                                                                                                  status=petition.status, 
-                                                                                                                  comment=petition.comment,
-                                                                                                                  admin_id=user[0]["id"]))
-            else:
-                return status.HTTP_403_FORBIDDEN
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    await send_notification_by_email(emails[0]["petitioner_emails"], f'Обновление статуса заявки №{petition.id}:',  f' Новый статус завки - {petition.status.upper()}')
-    return status.HTTP_200_OK
+        raise HTTPException(status_code=500)
+    if user[0]["is_moderator"] == True:
+        emails = await send_to_get_data(PETITION_SERVICE_ADDRESS + '/update_petition_status', PetitionStatusOutput(id=petition.id, 
+                                                                                                            status=petition.status, 
+                                                                                                            comment=petition.comment,
+                                                                                                            admin_id=user[0]["id"],
+                                                                                                            admin_region=user[0]["region"],
+                                                                                                            admin_city=user[0]["city"]))
+    else:
+        raise HTTPException(status_code=403)
+    try:
+        await send_notification_by_email(
+            emails[0]["petitioner_emails"], 
+            f'Обновление статуса заявки №{petition.id}:',  
+            f'Новый статус завки - {petition.status.upper()}'
+        )
+    except Exception as e:
+        # Логируем возможные ошибки отправки письма
+        logger.error(f"Ошибка отправки письма: {str(e)}")
+    finally:
+        return emails
 
 # маршрут для обновления статуса заявки
 @router.post("/get_detailed_analysis")
 async def get_detailed_analysis(data: DataForDetailedAnalysis):
     try:
-        result = await send_to_get_data(CLIENT_SERVICE_ADDRESS + '/verify_user', Token(token = data.user_token))
-        if result:
-            if result[0]["is_moderator"] == True:
+        user = await send_to_get_data(CLIENT_SERVICE_ADDRESS + '/verify_user', Token(token = data.user_token))
+        if user:
+            if user[0]["is_moderator"] == True:
                 Analysis = await send_to_get_data(PETITION_SERVICE_ADDRESS + '/get_detailed_analysis', RegionForDetailedAnalysis(region_name=data.region_name,
                                                                                                                               city_name=data.city_name,
                                                                                                                               start_time=data.start_time,
                                                                                                                               end_time=data.end_time,
                                                                                                                               rows_count=data.rows_count))
-                return Analysis
             else:
                 return status.HTTP_403_FORBIDDEN
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except:
+        raise HTTPException(status_code=500)
+    return Analysis
     
     
 
@@ -226,6 +241,6 @@ async def get_detailed_analysis(data: DataForDetailedAnalysis):
 async def get_brief_analysis(subject: SubjectForBriefAnalysis):
     try:
         result = await send_to_get_data(PETITION_SERVICE_ADDRESS + '/get_brief_analysis', subject)
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except:
+        raise HTTPException(status_code=500)
+    return result
